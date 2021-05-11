@@ -8,7 +8,7 @@
 
 # Load modules and software paths into environment
 #
-module load biopython
+module load python/3.8.1
 module load diamond
 module load kaiju
 
@@ -76,13 +76,12 @@ python $createDB/extract_kaiju_reads.py -k noneuk2euk -s non_eukaryota.pep -o ne
 #
 python $createDB/kmer_split.py -k 70 -s 10 -i $data/negatives.pep -o $data/negatives70_10.pep
 # python $createDB/kmer_split.py -k 70 -s 10 -i $data/marker_geneDB.fasta -o $data/marker_geneDB70_10.pep
-cat $data/negatives70_10.pep $data/marker_geneDB70_10.pep > $data/all70_10.pep
 
 
 # Prepare reads for parallel diamond alignment
 #
-# mkdir diamond_results
-# mv $data/all70_10.pep diamond_results/
+mkdir diamond_results
+cat $data/negatives70_10.pep $data/marker_geneDB70_10.pep > $data/diamond_results/all70_10.pep
 # cd diamond_results
 # python $createDB/diamond_preprocess_kmers.py all70_10.pep
 

@@ -9,8 +9,6 @@ args = parser.parse_args()
 
 mapped_reads = {i.strip().split('\t')[1].split(' ')[0]:0 for i in open(args.k)}
 
-print "Finished processing kaiju output file!!!"
-
 neg = {}
 
 if args.s.endswith('fastq'):
@@ -29,7 +27,6 @@ elif args.s.endswith('pep'):
         for i in SeqIO.parse(args.s,'fasta'):
                 if str(i.id) in mapped_reads:
                         neg[str(i.seq)] = 0
-
 
 with open(args.o,'w') as out:
 	for seq in neg.keys():
