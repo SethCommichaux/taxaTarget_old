@@ -2,10 +2,9 @@ import argparse
 import ast
 import math
 
-def logistic_function(x,x0,k,L=1):
-	if x0 == 0: return 0
-	prob = L/(1 + math.e**(-k*(x-x0)))	
-	return prob
+def logistic_prob(slope,intercept,x):
+	if 'na' in [slope,intercept]: return 0
+	return 1/(1+(math.exp(-1*(intercept+slope*x))))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", help="diamond output file")
@@ -37,33 +36,20 @@ for i in open(args.d):
 	MG_region = MG+'_'+region
 	if classifiers[MG_region] != {}:
 		mean_bitscore = bitscore/aln_len
-		smin = classifiers[MG_region].get('s',0)
-		gmin = classifiers[MG_region].get('g',0)
-		fmin = classifiers[MG_region].get('f',0)
-		nmax = classifiers[MG_region].get('n',0)	
-		if nmax == 0:
-			nmax = min([x for x in [smin,gmin,fmin] if x != 0])/2.0
-		sprob = 0
-		gprob = 0
-		fprob = 0
-		try:
-			sprob = logistic_function(mean_bitscore,(smin+nmax)/2.0,k = abs(smin-nmax))
-			if gmin != 0:
-				gprob = logistic_function(mean_bitscore,(gmin+nmax)/2.0,k = abs(gmin-nmax))
-			if fmin != 0:
-				fprob = logistic_function(mean_bitscore,(fmin+nmax)/2.0,k = abs(fmin-nmax))
-		except ZeroDivisionError: continue
-		# nprob = logistic_function(mean_bitscore,nmax)
-		# if nprob != 0: nprob = 1 - nprob
+		sslope,sint = classifiers[MG_region].get('s',['na','na'])
+		sprob = logistic_prob(sslope,sint,mean_bitscore)
+		gslope,gint = classifiers[MG_region].get('g',['na','na'])
+		gprob = logistic_prob(gslope,gint,mean_bitscore)
+		fslope,fint = classifiers[MG_region].get('f',['na','na'])
+		fprob = logistic_prob(fslope,fint,mean_bitscore)
 		probs = [fprob,gprob,sprob]
 		ranks = 'fgs'
 		rank = 'n'
 		for x,prob in enumerate(probs):
-			if prob != 0:
-				if prob >= args.t:
-					rank = ranks[x]
-				else:
-					break
+			if prob >= args.t:
+				rank = ranks[x]
+			else:
+				break
 		if rank != 'n':
 			print(read,rank,probs,classifiers[MG_region],mean_bitscore)
 
