@@ -48,19 +48,11 @@ for i in open(args.d):
 		for x,prob in enumerate(probs):
 			if prob >= args.t:
 				rank = ranks[x]
-			else:
-				break
+			#else:
+			#	break
 		if rank != 'n':
 			print(read,rank,probs,classifiers[MG_region],mean_bitscore)
 
 
 
 
-
-'''
-
-
-		elif mean_bitscore >= classifiers[MG_region]['s']: print(read,'s',mean_bitscore,classifiers[MG_region]['s'])
-		elif mean_bitscore >= classifiers[MG_region].get('g',100): print(read,'g',mean_bitscore,classifiers[MG_region].get('g',100))
-		elif mean_bitscore >= classifiers[MG_region].get('f',100): print(read,'f',mean_bitscore,classifiers[MG_region].get('f',100))
-'''
