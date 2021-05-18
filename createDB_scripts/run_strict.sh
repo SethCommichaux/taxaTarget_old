@@ -12,5 +12,5 @@
 
 module load python/3.8.1
 
-python /lustre/scratch/Seth.Commichaux/Busco_Protist_Pipeline/createDB_scripts/filter_regions.py -s $1 -o $1.filtered
+python /lustre/scratch/Seth.Commichaux/Busco_Protist_Pipeline/createDB_scripts/filter_regions.py -s $1
 

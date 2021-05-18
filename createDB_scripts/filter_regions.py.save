@@ -1,0 +1,46 @@
+import sys
+import pickle
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+import argparse
+
+def train_logistic_regression(x,labels):
+	x = np.array(x)
+	X = x[:, np.newaxis]
+	clf = LogisticRegression(multi_class='multinomial', solver='newton-cg')
+	clf.fit(X, labels)
+	return clf
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-s", help="strict classifier file")
+parser.add_argument("-o", help="desired output file")
+args = parser.parse_args()
+
+f = args.s   # 'strict_classifiers.txt'
+
+with open('pickle_list.txt','w') as out, open('pickles','wb') as out2:
+	for h,i in enumerate(open(f)):
+		if h%10000 == 0: print(h)
+		line = i.strip().split('\t')
+		n,smin,smax,gmin,gmax,fmin,fmax = float(line[1]),float(line[2]),float(line[3]),float(line[4]),float(line[5]),float(line[6]),float(line[7])
+		if smin == 100: continue # skip regions with no species-specific read mappings
+		if gmin == 100: gmin = 0
+		if fmin == 100: fmin = 0
+		if smax > max([n,gmin,gmax,fmin,fmax]):
+			SMIN = max(smin,gmax,gmin,fmax,fmin,n)
+			x = [smax,SMIN,max(n,SMIN/3.),0]
+			labels = ['s','s','n','n']
+			if fmax > n:
+				FMIN = max(fmin,n)
+				x += [fmax,FMIN]
+				labels += ['f','f']
+			if gmax > max(n,fmax):
+				GMIN = max(gmin,n,fmax)
+				x += [gmax,GMIN]
+				labels += ['g','g']
+			logRegressModel = train_logistic_regression(x,labels)
+			out.write(line[0]+'\t')
+			pickle.dump(logRegressModel,out)
+			out.write('\n')	
+
+

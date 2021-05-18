@@ -8,8 +8,6 @@ args = parser.parse_args()
 
 mapped_reads = {i.strip().split('\t')[1]:0 for i in open(args.k)}
 
-print "Finished processing kaiju output file!!!"
-
 read_count = 0
 av_read_len = 0
 

@@ -10,6 +10,7 @@
 module load diamond
 module load kaiju
 module load biopython
+module load python/3.8.1
 
 createDB="/lustre/scratch/Seth.Commichaux/Busco_Protist_Pipeline/createDB_scripts/"
 protist_data="/lustre/scratch/Seth.Commichaux/Busco_Protist_Pipeline/data/"
@@ -22,7 +23,7 @@ queryDB=$protist_data"/marker_geneDB.fasta"
 ################################################################
 ################################################################
 
-echo $1
+echo taxaTarget $1
 
 # Fastq file(s) to be analyzed
 #
@@ -36,20 +37,20 @@ cd $out
 
 # Run kaiju to query fastq reads against protein sequence binning databse (binningDB.fasta)
 #
-kaijux -f $kaijuDB -i ../$reads_fastq -z 12 -m 9 | grep "^C" > kaiju
+# kaijux -f $kaijuDB -i ../$reads_fastq -z 12 -m 9 | grep "^C" > kaiju
 
 
 # Extract reads that aligned to binning database
 #
-python $run_pipeline/extract_kaiju_reads.py -k kaiju -s ../$reads_fastq -o kaiju.fasta
+# python $run_pipeline/extract_kaiju_reads.py -k kaiju -s ../$reads_fastq -o kaiju.fasta
 
 
 # Align binned reads, with Diamond, to queryDB
 #
 # --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qseq sseq qlen
-time diamond blastx --top 0 --sensitive --min-score 55 --db $queryDB --query kaiju.fasta --threads 12 --outfmt 6 --out kaiju.fasta.diamond
+# diamond blastx --top 0 --sensitive --min-score 55 --db $queryDB --query kaiju.fasta --threads 12 --outfmt 6 --out kaiju.fasta.diamond
 
 
 # Classify reads
 #
-python $run_pipeline/classify_reads.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -c $protist_data/strict_classifiers_filtered.txt
+python $run_pipeline/classify_reads_multilogit.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -t 0 -p $protist_data/logistic_classifiers.txt -f $protist_data/fullnamelineage.dmp > reads_classified.txt
