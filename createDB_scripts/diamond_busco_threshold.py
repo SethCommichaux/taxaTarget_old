@@ -44,7 +44,7 @@ results = {}
 for i in open(args.d):
 	tmp = i.strip().split('\t')
 	query,subject,aln_len,bitscore = tmp[0].split('-')[0],tmp[1].split('_')[0],float(tmp[3]),float(tmp[-1])
-	if subject not in eukdetect_MGS: continue
+	# if subject not in eukdetect_MGS: continue
 	if bitscore >= bitscore_cutoffs[subject]:
 		if aln_len >= length_cutoffs[subject]:
 			results[query] = [subject,'NA','NA','NA','NA','NA','NA']
@@ -76,7 +76,7 @@ for i in SeqIO.parse(args.f,'fasta'):
 
 # uniprot busco_id len species_id genus_id family_id lineage seq
 
-with open('a','w') as out, open('marker_gene_metadata.txt','w') as out2:
+with open('marker_geneDB.fasta','w') as out, open('marker_gene_metadata.txt','w') as out2:
 	for k,v in results.items():
 		if v[2] == 'NA': continue # skip proteins that lack a species label
 		out.write(">"+k+"\n"+v[6]+"\n")

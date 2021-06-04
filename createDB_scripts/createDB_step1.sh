@@ -47,7 +47,7 @@ cd $data
 
 # Extract eukarota and non-eukaryota protein sequences
 #
-python $createDB/splitUniRef100.py -g uniref100.fasta.gz -t fullnamelineage.dmp -n nodes.dmp
+# python $createDB/splitUniRef100.py -g uniref100.fasta.gz -t fullnamelineage.dmp -n nodes.dmp
 
 
 # Identify eukaryota marker genes
@@ -68,27 +68,27 @@ python $createDB/splitUniRef100.py -g uniref100.fasta.gz -t fullnamelineage.dmp 
 
 # Identify candidates for non-protist/non-fungi negatives dataset
 #
-kaijup -a greedy -e 3 -f $data/marker_geneDB.fasta.kaiju.fmi -i $data/non_eukaryota.pep -z 12 -m 12 -s 50 | grep "^C" > noneuk2euk
-python $createDB/extract_kaiju_reads.py -k noneuk2euk -s non_eukaryota.pep -o negatives.pep
+# kaijup -a greedy -e 3 -f $data/marker_geneDB.fasta.kaiju.fmi -i $data/non_eukaryota.pep -z 12 -m 12 -s 50 | grep "^C" > noneuk2euk
+# python $createDB/extract_kaiju_reads.py -k noneuk2euk -s non_eukaryota.pep -o negatives.pep
 
 
 # Extract kmers from positive and negative datasets
 #
-python $createDB/kmer_split.py -k 70 -s 10 -i $data/negatives.pep -o $data/negatives70_10.pep
+# python $createDB/kmer_split.py -k 70 -s 10 -i $data/negatives.pep -o $data/negatives70_10.pep
 # python $createDB/kmer_split.py -k 70 -s 10 -i $data/marker_geneDB.fasta -o $data/marker_geneDB70_10.pep
 
 
 # Prepare reads for parallel diamond alignment
 #
-mkdir diamond_results
-cat $data/negatives70_10.pep $data/marker_geneDB70_10.pep > $data/diamond_results/all70_10.pep
-# cd diamond_results
+# mkdir diamond_results
+# cat $data/negatives70_10.pep $data/marker_geneDB70_10.pep > $data/diamond_results/all70_10.pep
+cd diamond_results
 # python $createDB/diamond_preprocess_kmers.py all70_10.pep
 
 
 # Submit parallel jobs for diamond alignment
 #
-# for i in $data/diamond_results/*[0]
-# do
-# sbatch $createDB/createDB_step2.sh $i $data/marker_geneDB.fasta
-# done 
+for i in $data/diamond_results/*.fasta
+do
+sbatch $createDB/createDB_step2.sh $i $data/marker_geneDB.fasta
+done 

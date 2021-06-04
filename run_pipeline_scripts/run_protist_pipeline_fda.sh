@@ -37,20 +37,23 @@ cd $out
 
 # Run kaiju to query fastq reads against protein sequence binning databse (binningDB.fasta)
 #
-# kaijux -f $kaijuDB -i ../$reads_fastq -z 12 -m 9 | grep "^C" > kaiju
+kaijux -f $kaijuDB -i ../$reads_fastq -z 12 -m 9 | grep "^C" > kaiju
 
 
 # Extract reads that aligned to binning database
 #
-# python $run_pipeline/extract_kaiju_reads.py -k kaiju -s ../$reads_fastq -o kaiju.fasta
+python $run_pipeline/extract_kaiju_reads.py -k kaiju -s ../$reads_fastq -o kaiju.fasta
 
 
 # Align binned reads, with Diamond, to queryDB
 #
 # --outfmt 6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qseq sseq qlen
-# diamond blastx --top 0 --sensitive --min-score 55 --db $queryDB --query kaiju.fasta --threads 12 --outfmt 6 --out kaiju.fasta.diamond
+diamond blastx --top 0 --sensitive --min-score 55 --db $queryDB --query kaiju.fasta --threads 12 --outfmt 6 --out kaiju.fasta.diamond
 
 
 # Classify reads
 #
-python $run_pipeline/classify_reads_multilogit.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -t 0 -p $protist_data/logistic_classifiers.txt -f $protist_data/fullnamelineage.dmp > reads_classified.txt
+python $run_pipeline/classify_reads_strict.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -c $protist_data/strict_classifiers_filtered.txt -t 0.40 -f $protist_data/fullnamelineage.dmp
+
+
+# python $run_pipeline/classify_reads_multilogit.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -t 0.2 -p $protist_data/logistic_classifiers.txt -f $protist_data/fullnamelineage.dmp > reads_classified.txt

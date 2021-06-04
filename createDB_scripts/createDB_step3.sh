@@ -8,9 +8,7 @@
 
 # Load modules and software paths into environment
 #
-module load biopython
-module load diamond
-module load kaiju
+module load python/3.8.1
 
 
 PWD=`pwd`
@@ -36,7 +34,20 @@ python $createDB/strict_threshold_classifiers.py -d $data/diamond_results/ -m $d
 python $createDB/classification_power_per_protein_region.py
 
 
+# Split strict classifier files into many then process each in parallel
+# 
+mkdir $data/classifiers
+cd $data/classifiers
+split -l 100000 $data/strict_classifiers.txt tmp
+
 
 # Filter regions for species level classification power
 #
+for i in tmp*;
+do python filter_regions.py -s $i -o $i.classifiers;
+done
 
+
+# concatenate results
+#
+cat *classifiers > $data/strict_classifiers_filtered.txt
