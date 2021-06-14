@@ -32,11 +32,11 @@ for h,i in enumerate(open(f)):
 			break
 
 
-for k,v in perMG.items():
-	print k,'\t',v['n'],'\t',v['s'],'\t',v['g'],'\t',v['f']
+# for k,v in perMG.items():
+#	print k,'\t',v['n'],'\t',v['s'],'\t',v['g'],'\t',v['f']
 
-for k,v in total.items():
-	print(k,v)
+# for k,v in total.items():
+#	print(k,v)
 
 
 with open('per_protein_region_classification.txt','w') as out:

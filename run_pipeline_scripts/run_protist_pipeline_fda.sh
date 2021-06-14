@@ -12,6 +12,9 @@ module load kaiju
 module load biopython
 module load python/3.8.1
 
+
+# Set paths to directories and databases
+#
 createDB="/lustre/scratch/Seth.Commichaux/Busco_Protist_Pipeline/createDB_scripts/"
 protist_data="/lustre/scratch/Seth.Commichaux/Busco_Protist_Pipeline/data/"
 run_pipeline="/lustre/scratch/Seth.Commichaux/Busco_Protist_Pipeline/run_pipeline_scripts/"
@@ -22,6 +25,7 @@ queryDB=$protist_data"/marker_geneDB.fasta"
 ################################################################
 ################################################################
 ################################################################
+
 
 echo taxaTarget $1
 
@@ -53,7 +57,6 @@ diamond blastx --top 0 --sensitive --min-score 55 --db $queryDB --query kaiju.fa
 
 # Classify reads
 #
-python $run_pipeline/classify_reads_strict.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -c $protist_data/strict_classifiers_filtered.txt -t 0.40 -f $protist_data/fullnamelineage.dmp
-
+python $run_pipeline/classify_reads_strict.py -n 0.95 -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -c $protist_data/strict_classifiers_filtered.txt -t 0.4 -f $protist_data/fullnamelineage.dmp -mg $protist_data/255_MGs.txt
 
 # python $run_pipeline/classify_reads_multilogit.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -t 0.2 -p $protist_data/logistic_classifiers.txt -f $protist_data/fullnamelineage.dmp > reads_classified.txt

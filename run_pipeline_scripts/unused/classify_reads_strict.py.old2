@@ -30,10 +30,7 @@ def collect_thresholds(classifiers):
 		tmp = i.strip().split('\t')
 		region = tmp[0]
 		if region in classifiers:
-			thresholds = []
-			for x in tmp[1:]:
-				if x == 'na': thresholds.append('na')
-				else: thresholds.append(float(x))
+			thresholds = ast.literal_eval(tmp[1])
 			classifiers[region] = thresholds
 	return classifiers
 
@@ -58,7 +55,6 @@ parser.add_argument("-c", help="marker gene thresholds file")
 parser.add_argument("-t", help="proportion of range(smax - nmax) to not use for classification",default=0.1,type=float)
 parser.add_argument("-f", help="NCBI fullnamelineage.dmp file")
 parser.add_argument("-mg", help="214 marker gene name file")
-parser.add_argument("-n", help="Maximum proportion of alignment score range that can be negatives to include classifier",default=0.95,type=float)
 args = parser.parse_args()
 
 taxaID2Lineage = taxa_mappings()
@@ -80,13 +76,13 @@ genus_species = {}
 with open('classified_reads.txt','w') as out:
 	for i in open(args.d):
 		tmp = i.strip().split('\t')
-		read,MG,pident,aln_len,start,end,bitscore = tmp[0],tmp[1],float(tmp[2]),float(tmp[3]),int(tmp[8]),int(tmp[9]),float(tmp[11])
+		read,MG,aln_len,start,end,bitscore = tmp[0],tmp[1],float(tmp[3]),int(tmp[8]),int(tmp[9]),float(tmp[11])
 		mean_bitscore = bitscore/aln_len
 		if aln_len >= 30:
 			region = str(int(20 * math.floor(min(start,end)/20)))
 			MG_region = MG+'_'+region
 			busco,species,genus,family = metadata[MG]
-			if (multimapped[read] > 1) and (pident == 100):
+			if multimapped[read] > 1:
 				if read not in read_classifications:
 					read_classifications[read] = [[taxaID2Lineage[species]],set([busco]),mean_bitscore]
 				else:
@@ -96,8 +92,8 @@ with open('classified_reads.txt','w') as out:
 				nmax,smin,smax,gmin,gmax,fmin,fmax = classifiers[MG_region]
 				threshold = ((smax - nmax)*args.t) + nmax
 				negative_range = nmax/smax
+				if negative_range >= 0.95: continue
 				if mean_bitscore < threshold: continue
-				if negative_range >= args.n: continue
 				lineage = ''
 				if mean_bitscore >= smin:
 					lineage = taxaID2Lineage[species]
@@ -122,6 +118,7 @@ with open('classified_reads.txt','w') as out:
 						read_classifications[read][1].update([busco])
 
 mg_names = [i.strip() for i in open(args.mg)] + ['Total_reads']
+# taxa2bitscores = {'names':mg_names}
 sample_taxa = {'names':mg_names}
 
 for read,v in read_classifications.items():
@@ -130,9 +127,11 @@ for read,v in read_classifications.items():
     line = ';'.join(lca)
     if line not in sample_taxa:
         sample_taxa[line] = np.zeros(len(mg_names))
+        # taxa2bitscores[line] = np.zeros(214)
     for i in buscos:
         sample_taxa[line][mg_names.index(i)] += 1
         sample_taxa[line][-1] += 1
+        # taxa2bitscores[line][mg_names.index(i)] += mean_bitscore
 
 df = pd.DataFrame(sample_taxa)
 t = df.transpose()
@@ -150,22 +149,26 @@ print('final read classifications produced')
 
 aggregate_taxa = {}
 
-for k,v in sample_taxa.items():
-    if k == 'names': continue
-    counts = v[-1]
-    buscos = {mg_names[h] for h,i in enumerate(v) if i > 0}
-    if counts < 4: continue
+with open('validation.txt','w') as out:
+  for k,v in sample_taxa.items():
+    counts,buscos,len_counts = v[0],v[1],len(v[0])
+    if len_counts < 2: continue
     if len(buscos) < 2: continue
     if len(buscos) < 6:
-        if counts > 1.7**len(buscos): continue
+        if len_counts > 1.7**len(buscos): continue
+    for i in counts:
+        out.write(i+'\t'+k+'\n')
     line = ''
     for j in k.split(';'):
         line += j+';'
         if line not in aggregate_taxa:
-            aggregate_taxa[line] = [counts,buscos]
+            aggregate_taxa[line] = [len_counts,buscos]
         else:
-            aggregate_taxa[line][0] += counts
+            print(aggregate_taxa[line][0])
+            print(counts)
+            aggregate_taxa[line][0] += len_counts
             aggregate_taxa[line][1].update(buscos)
+            print(aggregate_taxa[line][0])
 
 print('aggregated results. writing out to taxonomic report')
 

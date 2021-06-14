@@ -31,4 +31,5 @@ with open(args.o,'w') as out:
 				tmp.append(fmax)
 			else:
 				tmp += ['na','na']
-			out.write(line[0]+'\t'+str(tmp)+'\n')	
+			tmp = [str(x) for x in tmp]
+			out.write(line[0]+'\t'+'\t'.join(tmp)+'\n')	

@@ -26,7 +26,7 @@ cd $data
 
 # Retrieve classification thresholds for each protein
 #
-python $createDB/strict_threshold_classifiers.py -d $data/diamond_results/ -m $data/marker_gene_metadata.txt
+# python $createDB/strict_threshold_classifiers.py -d $data/diamond_results/ -m $data/marker_gene_metadata.txt
 
 
 # Collect summary information about the classification power of marker genes
@@ -44,7 +44,7 @@ split -l 100000 $data/strict_classifiers.txt tmp
 # Filter regions for species level classification power
 #
 for i in tmp*;
-do python filter_regions.py -s $i -o $i.classifiers;
+do python $createDB/filter_regions.py -s $i -o $i.classifiers;
 done
 
 
