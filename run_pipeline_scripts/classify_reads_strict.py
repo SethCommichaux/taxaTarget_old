@@ -1,5 +1,6 @@
 import argparse
 import ast
+import sys
 import math
 from collections import Counter
 import pandas as pd
@@ -11,7 +12,7 @@ def taxa_mappings(): # function for parsing the NCBI fullnamelineage.dmp file
       tmp = i.strip().upper().split('|')
       taxaID = tmp[0].strip()
       taxaName = tmp[1].lower().strip()
-      lineage = tmp[2].lower().strip()+taxaName
+      lineage = tmp[2].lower().strip().replace('; ',';')+taxaName
       taxaID2Lineage[taxaID] = lineage
   return taxaID2Lineage
 
@@ -37,14 +38,17 @@ def collect_thresholds(classifiers):
 			classifiers[region] = thresholds
 	return classifiers
 
-def collect_classifiera_metadata():
-	metadata = {}
+def collect_classifier_metadata(taxaID2Lineage):
+	metadata,mg_per_species = {},{}
 	
 	for i in open(args.m):
 		tmp = i.strip().split('\t')
 		prot,MG,species,genus,family = tmp[0],tmp[1],tmp[3],tmp[4],tmp[5]
 		metadata[prot] = [MG,species,genus,family]
-	return metadata
+		species_lineage = taxaID2Lineage[species]
+		if species_lineage not in mg_per_species: mg_per_species[species_lineage] = set([MG])
+		else: mg_per_species[species_lineage].update([MG])
+	return metadata,mg_per_species
 
 def LCA(lineages): # function for finding the lowest common ancestor of a set of lineages
     lineages = [x.split(';') for x in lineages]
@@ -70,7 +74,7 @@ print('diamond file first pass')
 classifiers = collect_thresholds(classifiers)
 print('collected relevant classifiers')
 
-metadata = collect_classifiera_metadata()
+metadata,MG_per_species = collect_classifier_metadata(taxaID2Lineage)
 print('collected relevant metadata for marker genes')
 
 read_classifications = {}
@@ -123,6 +127,7 @@ with open('classified_reads.txt','w') as out:
 
 mg_names = [i.strip() for i in open(args.mg)] + ['Total_reads']
 sample_taxa = {'names':mg_names}
+final_read_classifications = {}
 
 for read,v in read_classifications.items():
     lineages,buscos,mean_bitscore = v[0],v[1],v[2]
@@ -130,6 +135,10 @@ for read,v in read_classifications.items():
     line = ';'.join(lca)
     if line not in sample_taxa:
         sample_taxa[line] = np.zeros(len(mg_names))
+    if line not in final_read_classifications:
+        final_read_classifications[line] = [read]
+    else:
+        final_read_classifications[line].append(read)
     for i in buscos:
         sample_taxa[line][mg_names.index(i)] += 1
         sample_taxa[line][-1] += 1
@@ -137,16 +146,32 @@ for read,v in read_classifications.items():
 df = pd.DataFrame(sample_taxa)
 t = df.transpose()
 
-# df2 = pd.DataFrame(taxa2bitscores)
-# t2 = df2.transpose()
+t.to_csv('marker_gene_read_counts_per_taxa.txt',sep='\t')
 
-t.to_csv('final_read_classifications.txt',sep='\t')
+print('marker gene counts collected')
 
-print('final read classifications produced')
-
-# for genus,v in genus_species.items():
-#	for species in v:
-#		print(genus,t.loc[[1]])
+for k,v in genus_species.items():
+	s = {}
+	for line in v:
+		if line in sample_taxa:
+			s[line] = sample_taxa[line]
+	
+	try:
+		primary,primary_counts = max(s.items(),key=lambda x: x[1][-1])
+		
+		for z,w in s.items():
+			if z != primary:
+				shared,different = [0.1,0.1],[0.0,0.0] # [number_genes,number_reads]; shared are set to 0.1 to avoid division by zero errors
+				for j in range(214):
+					if (mg_names[j] in MG_per_species[primary]) and (mg_names[j] in MG_per_species[z]):
+						shared[0] += 1
+						shared[1] += w[j]
+					elif mg_names[j] in MG_per_species[z]:
+						different[0] += 1
+						different[1] += w[j]
+				if (different[1]/shared[1]) > ((different[0]/shared[0])+0.1*different[0]/shared[0]): # a false positive would be expected to have a lower number of reads mapping to shared genes than to not-shared genes; here within an epsilon of 10% is allowed
+					del sample_taxa[z]
+	except: continue
 
 aggregate_taxa = {}
 
@@ -154,10 +179,16 @@ for k,v in sample_taxa.items():
     if k == 'names': continue
     counts = v[-1]
     buscos = {mg_names[h] for h,i in enumerate(v) if i > 0}
-    if counts < 4: continue
-    if len(buscos) < 2: continue
+    if counts < 4:
+        if k in final_read_classifications: del final_read_classifications[k]
+        continue
+    if len(buscos) < 2:
+        if k in final_read_classifications: del final_read_classifications[k]
+        continue
     if len(buscos) < 6:
-        if counts > 1.7**len(buscos): continue
+        if counts > 1.7**len(buscos):
+            if k in final_read_classifications: del final_read_classifications[k]
+            continue
     line = ''
     for j in k.split(';'):
         line += j+';'
@@ -166,6 +197,11 @@ for k,v in sample_taxa.items():
         else:
             aggregate_taxa[line][0] += counts
             aggregate_taxa[line][1].update(buscos)
+
+with open('final_read_classifications.txt','w') as out:
+	for k,v in final_read_classifications.items():
+		for i in v:
+			out.write(i+'\t'+k+'\n')
 
 print('aggregated results. writing out to taxonomic report')
 
