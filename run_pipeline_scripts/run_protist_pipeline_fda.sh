@@ -57,6 +57,12 @@ diamond blastx --top 0 --sensitive --min-score 55 --db $queryDB --query kaiju.fa
 
 # Classify reads
 #
-python $run_pipeline/classify_reads_strict.py -n 0.95 -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -c $protist_data/strict_classifiers_filtered.txt -t 0.4 -f $protist_data/fullnamelineage.dmp -mg $protist_data/255_MGs.txt
+python $run_pipeline/classify_reads_strict.py -n 0.95 -d kaiju.fasta.diamond -dir $protist_data/ -t 0.0  -p 0.1
+
+
+
+
+
+
 
 # python $run_pipeline/classify_reads_multilogit.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -t 0.2 -p $protist_data/logistic_classifiers.txt -f $protist_data/fullnamelineage.dmp > reads_classified.txt
