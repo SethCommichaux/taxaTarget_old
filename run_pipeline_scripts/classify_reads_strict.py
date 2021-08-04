@@ -7,12 +7,14 @@ from collections import Counter
 from scipy import stats
 
 def read_file_info():
+	# function extracts number of reads and mean read length from read_file_info.txt
 	for h,i in enumerate(open('read_file_info.txt')):
 		if h == 0: number_reads = float(i.strip())
 		elif h == 1: read_len = float(i.strip())
 	return number_reads,read_len
 
-def taxa_mappings(): # function for parsing the NCBI fullnamelineage.dmp file
+def taxa_mappings():
+  # function for parsing NCBI fullnamelineage.dmp and returning a dict mapping taxa ID to taxonomic lineage
   taxaID2Lineage = {}
   for i in open(args.dir+'/fullnamelineage.dmp'):
       tmp = i.strip().upper().split('|')
@@ -24,6 +26,8 @@ def taxa_mappings(): # function for parsing the NCBI fullnamelineage.dmp file
   return taxaID2Lineage
 
 def used_classifiers():
+	# identifies all 20 amino acid windows of all database genes that will be used for taxonomic classification
+	# it reduces memory usage to only load classifier data that is relevant to the sample rather than all classifier data
 	c = {}
 	for i in open(args.d):
 		tmp = i.strip().split('\t')
@@ -34,6 +38,8 @@ def used_classifiers():
 	return c
 
 def collect_thresholds(classifiers):
+	# for every 20 amino acid region to be used for classification, this function collects the thresholds
+	# for negatives, family, genus and species levels
 	for i in open(args.dir+'/strict_classifiers_filtered.txt'):
 		tmp = i.strip().split('\t')
 		region = tmp[0]
@@ -46,6 +52,9 @@ def collect_thresholds(classifiers):
 	return classifiers
 
 def collect_classifier_metadata(taxaID2Lineage):
+	# function collects metadata associated with each classifier
+	# example metadata includes: UniProt ID, BUSCO marker gene ID, protein length, taxonomic IDs for
+	# family, genus and species, as well as the full taxonomic lineage
 	metadata,mg_per_species,prot2len = {},{},{}
 	
 	for i in open(args.dir+'/marker_gene_metadata.txt'):
@@ -58,15 +67,16 @@ def collect_classifier_metadata(taxaID2Lineage):
 		else: mg_per_species[species_lineage].update([MG])
 	return metadata,mg_per_species,prot2len
 
-def LCA(lineages): # function for finding the lowest common ancestor of a set of lineages
+def LCA(lineages):
+    # function for finding the lowest common ancestor of a list of lineages
     lineages = [x.split(';') for x in lineages]
     new_lineage = [i[0].strip() for i in zip(*lineages) if len(set(i)) == 1 if '' not in i]
     return new_lineage
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-d", help="diamond output file")
-parser.add_argument("-dir", help="path to data directory of taxaTarget")
-parser.add_argument("-p", help="proportion of range(smax - 0) to add to thresholds for species, genus and family",default=0.05,type=float)
+parser.add_argument("-d", help="diamond output file", required = True)
+parser.add_argument("-dir", help="path to data directory of taxaTarget", required = True)
+parser.add_argument("-p", help="proportion of range(0,smax) to add to thresholds for species, genus and family",default=0.02,type=float)
 args = parser.parse_args()
 
 # extract number of reads in sample and mean read length
@@ -102,17 +112,33 @@ with open('classified_reads.txt','w') as out:
 			MG_region = MG+'_'+region
 			busco,species,genus,family = metadata[MG]
 			if (multimapped[read] > 1) and (pident == 100):
+				# assign lowest common ancestor to reads that map ambiguously (i.e. 100% identity) to multiple proteins
 				if read not in read_classifications:
 					read_classifications[read] = [[taxaID2Lineage[species]],set([busco]),mean_bitscore,[prot2len[MG]]]
 				else:
 					read_classifications[read][0].append(taxaID2Lineage[species])
 					read_classifications[read][1].update([busco])
 					read_classifications[read][3].append(prot2len[MG])
-			elif classifiers[MG_region] != {}:
+			elif classifiers[MG_region] != {}: # check reads map to marker gene regions with classifiers
 				nmax,smin,smax,gmin,gmax,fmin,fmax = classifiers[MG_region]
 				padding = args.p*smax
+				if nmax == 0:
+					# if region lacked negative training data, pad classifier thresholds
+					smin += padding
+					try: gmin += padding
+					except: None
+					try: fmin += padding
+					except: None
+				elif fmin == 'na':
+					# if region lacked family training data, pad genus and species thesholds 
+					smin += padding
+					try: gmin += padding
+					except: None
+				elif gmin == 'na':
+					# if region lacked genus training data, pad species threshold
+					smin += padding
 				lineage = ''
-				if mean_bitscore >= smin + padding:
+				if mean_bitscore >= smin:
 					lineage = taxaID2Lineage[species]
 					out.write(read+'\t'+'species'+'\t'+busco+'\t'+MG_region+'\t'+str(mean_bitscore)+'\t'+lineage+'\n')
 					if genus not in genus_species:
@@ -120,11 +146,11 @@ with open('classified_reads.txt','w') as out:
 					else:
 						genus_species[genus].update([lineage])
 				elif gmin != 'na':
-					if mean_bitscore >= gmin + padding:
+					if mean_bitscore >= gmin:
 						lineage = taxaID2Lineage[genus]
 						out.write(read+'\t'+'genus'+'\t'+busco+'\t'+MG_region+'\t'+str(mean_bitscore)+'\t'+lineage+'\n')
 				elif fmin != 'na':
-					if mean_bitscore >= fmin + padding:
+					if mean_bitscore >= fmin:
 						lineage = taxaID2Lineage[family]
 						out.write(read+'\t'+'family'+'\t'+busco+'\t'+MG_region+'\t'+str(mean_bitscore)+'\t'+lineage+'\n')
 				if lineage != '':
@@ -150,8 +176,8 @@ for read,v in read_classifications.items():
     else:
         final_read_classifications[line].append(read)
     for i in buscos:
-        sample_taxa[line][mg_names.index(i)] += 1 # read_len/average_prot_len
-        sample_taxa[line][-1] += 1 #read_len/average_prot_len
+        sample_taxa[line][mg_names.index(i)] += 1
+        sample_taxa[line][-1] += 1 
 
 del_keys = []
 
@@ -162,20 +188,20 @@ for k,v in sample_taxa.items():
     tmp = []
     non_zero = 0
     for i in lineage_MGS:
-        rd_cnt = sample_taxa[line][mg_names.index(i)]
+        rd_cnt = sample_taxa[k][mg_names.index(i)]
         tmp.append(rd_cnt)
         if rd_cnt > 0: non_zero += 1
     total_rd_cnt = sum(tmp)
     expected_number_MGs = 0.96270 * total_rd_cnt + -0.00128 * total_rd_cnt**2 + 1.89510
     if non_zero < 20:
-        if non_zero/float(len(tmp)) < 0.25:
-            if non_zero < expected_number_MGs*0.5:
+        if non_zero/float(len(tmp)) < 0.25: # if less than 25% of taxa's marker gene set have mapped reads
+            if non_zero < expected_number_MGs*0.25:
+                # print('k,v,total_rd_cnt,len(tmp),lineage_MGS,non_zero,non_zero/float(len(tmp)),expected_number_MGs,expected_number_MGs*0.25')
+                # print(k,v,total_rd_cnt,len(tmp),lineage_MGS,non_zero,non_zero/float(len(tmp)),expected_number_MGs,expected_number_MGs*0.25)
                 del_keys.append(k)
-    # if np.std(tmp)/np.mean(tmp) >= 2.7: del_keys.append(k)
 
 for i in del_keys:
 	del sample_taxa[i]
-
 
 '''
 experimental was never used

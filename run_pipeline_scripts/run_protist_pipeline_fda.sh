@@ -9,7 +9,6 @@
 #
 module load diamond
 module load kaiju
-module load biopython
 module load python/3.8.1
 
 
@@ -57,7 +56,7 @@ diamond blastx --top 0 --sensitive --min-score 55 --db $queryDB --query kaiju.fa
 
 # Classify reads
 #
-python $run_pipeline/classify_reads_strict.py -n 0.95 -d kaiju.fasta.diamond -dir $protist_data/ -t 0.0  -p 0.1
+python $run_pipeline/classify_reads_strict.py -d kaiju.fasta.diamond -dir $protist_data/ -p 0.02
 
 
 
@@ -65,4 +64,3 @@ python $run_pipeline/classify_reads_strict.py -n 0.95 -d kaiju.fasta.diamond -di
 
 
 
-# python $run_pipeline/classify_reads_multilogit.py -d kaiju.fasta.diamond -m $protist_data/marker_gene_metadata.txt -t 0.2 -p $protist_data/logistic_classifiers.txt -f $protist_data/fullnamelineage.dmp > reads_classified.txt
