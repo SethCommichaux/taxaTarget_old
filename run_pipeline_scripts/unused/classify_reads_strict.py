@@ -66,20 +66,19 @@ def collect_classifier_metadata(taxaID2Lineage):
 		else: mg_per_species[species_lineage].update([MG])
 	return metadata,mg_per_species,prot2len
 
-def pad_thresholds(nmax,smin,smax,gmin,fmin):
-	smax += 0.1
+def pad_thresholds(nmax,smin,gmin,fmin,padding):
 	if nmax == 0:
 		# if region lacked negative training data, pad family, genus and species thresholds
-		smin += padding*(smax-smin)
-		if type(gmin) != str: gmin += padding*(smax-gmin)
-		if type(fmin) != str: fmin += padding*(smax-fmin)
+		smin += padding
+		if type(gmin) != str: gmin += padding
+		if type(fmin) != str: fmin += padding
 	elif fmin == 'na':
 		# if region lacked family training data, pad genus and species thesholds 
-		smin += padding*(smax-smin)
-		if type(gmin) != str: gmin += padding*(smax-gmin)
+		smin += padding
+		if type(gmin) != str: gmin += padding
 	elif gmin == 'na':
 		# if region lacked genus training data, pad species threshold
-		smin += padding*(smax-smin)
+		smin += padding
 	return(nmax,smin,gmin,fmin)
 
 def classify_read_first_pass(smin,gmin,fmin,mean_bitscore):
@@ -111,11 +110,8 @@ def LCA(lineages):
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", help="diamond output file", required = True)
 parser.add_argument("-dir", help="path to data directory of taxaTarget", required = True)
-parser.add_argument("-p", help="padding to add to thresholds missing training data",default=0.5,type=float)
+parser.add_argument("-p", help="proportion of range(0,smax) to add to thresholds for species, genus and family",default=0.02,type=float)
 args = parser.parse_args()
-
-# set threshold padding variables
-padding = args.p
 
 # extract number of reads in sample and mean read length
 number_reads,read_len = read_file_info()
@@ -159,7 +155,8 @@ with open('classified_reads.txt','w') as out:
 					read_classifications[read][3].append(prot2len[MG])
 			elif classifiers[MG_region] != {}: # check reads map to marker gene regions with classifiers
 				nmax,smin,smax,gmin,gmax,fmin,fmax = classifiers[MG_region]
-				nmax,smin,gmin,fmin = pad_thresholds(nmax,smin,smax,gmin,fmin)
+				padding = args.p*smax
+				nmax,smin,gmin,fmin = pad_thresholds(nmax,smin,gmin,fmin,padding)
 				lineage,rank = classify_read_first_pass(smin,gmin,fmin,mean_bitscore)
 				if lineage != '':
 					out.write(read+'\t'+rank+'\t'+busco+'\t'+MG_region+'\t'+str(mean_bitscore)+'\t'+lineage+'\n')
@@ -177,19 +174,16 @@ final_read_classifications = {}
 for read,v in read_classifications.items():
     lineages,buscos,mean_bitscore,average_prot_len = v[0],v[1],v[2],sum(v[3])/float(len(v[3]))
     lca = LCA(lineages)
-    #line = ';'.join(lca)
-    line = ''
-    for i in range(len(lca)):
-        line = ';'.join(lca[:i+1])
-        if line not in sample_taxa:
-            sample_taxa[line] = np.zeros(len(mg_names))
-        if line not in final_read_classifications:
-            final_read_classifications[line] = [read]
-        else:
-            final_read_classifications[line].append(read)
-        for i in buscos:
-            sample_taxa[line][mg_names.index(i)] += 1
-            sample_taxa[line][-1] += 1 
+    line = ';'.join(lca)
+    if line not in sample_taxa:
+        sample_taxa[line] = np.zeros(len(mg_names))
+    if line not in final_read_classifications:
+        final_read_classifications[line] = [read]
+    else:
+        final_read_classifications[line].append(read)
+    for i in buscos:
+        sample_taxa[line][mg_names.index(i)] += 1
+        sample_taxa[line][-1] += 1 
 
 del_keys = []
 
@@ -209,6 +203,7 @@ for k,v in sample_taxa.items():
     total_rd_cnt = sum(tmp)
     expected_number_MGs = 0.96270 * total_rd_cnt + -0.00128 * total_rd_cnt**2 + 1.89510
     if total_rd_cnt < 3:
+        print(k)
         del_keys.append(k)
         del final_read_classifications[k]
     elif non_zero < 3:
