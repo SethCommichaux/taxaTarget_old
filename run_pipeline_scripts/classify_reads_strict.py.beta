@@ -103,6 +103,16 @@ def classify_read_first_pass(smin,gmin,fmin,mean_bitscore):
 			rank = 'family'
 	return(lineage,rank)
 
+def expected_read_cnt(total_rd_cnt,total_mgs):
+	r = range(int(total_mgs))
+	L = []
+	
+	for i in range(int(total_rd_cnt)):
+		L.append(random.choice(r))
+		most_common,num_most_common = Counter(L).most_common(1)[0]
+	
+	return num_most_common
+
 def LCA(lineages):
     # function for finding the lowest common ancestor of a list of lineages
     lineages = [x.split(';') for x in lineages]
@@ -208,21 +218,18 @@ for k,v in sample_taxa.items():
         tmp.append(rd_cnt)
         if rd_cnt > 0: non_zero += 1
     total_rd_cnt = sum(tmp)
-    expected_number_MGs = 0.96270 * total_rd_cnt + -0.00128 * total_rd_cnt**2 + 1.89510
+    if total_rd_cnt > 0:
+        expected_read_cutoff = expected_read_cnt(total_rd_cnt,len(tmp)) # maximum number of reads expected per marker gene, expecting a uniform distribution
+        for h,i in enumerate(tmp):
+            if i > expected_read_cutoff*2:
+                tmp[h] = 0
+    total_rd_cnt = sum(tmp)
     if total_rd_cnt < 3:
         del_keys.append(k)
         del final_read_classifications[k]
     elif non_zero < 3:
         del_keys.append(k)
         del final_read_classifications[k]
-    elif non_zero < 6:
-        if non_zero/float(len(tmp)) < 0.25: # if less than 25% of taxa's marker gene set have mapped reads
-            if total_rd_cnt > non_zero**1.8:
-              del_keys.append(k)
-              del final_read_classifications[k]
-            '''if non_zero < expected_number_MGs*0.25: # if less than 25% of expected number of marker genes have mapped reads
-                del_keys.append(k)
-                del final_read_classifications[k]'''
 
 for i in del_keys:
 	del sample_taxa[i]
