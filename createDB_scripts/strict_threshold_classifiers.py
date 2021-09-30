@@ -26,6 +26,7 @@ for f in os.listdir(args.d):
 		for i in open(args.d+'/'+f):
 			tmp = i.strip().split('\t')
 			read,MG,aln_len,start,end,bitscore = '_'.join(tmp[0].split('_')[:-1]),tmp[1],float(tmp[3]),float(tmp[8]),float(tmp[9]),float(tmp[-1])
+			if aln_len < 30: continue
 			region = str(int(20 * math.floor(min(start,end)/20))) # floor round to nearest 20
 			MG_region = MG+'_'+region
 			if MG_region not in results:
@@ -51,7 +52,6 @@ for f in os.listdir(args.d):
 						break
 				else:
 					results[MG_region][0] = max(mean_bitscore,results[MG_region][0])
-		print results.items()[:5]
 
 
 with open('strict_classifiers.txt','w') as out:

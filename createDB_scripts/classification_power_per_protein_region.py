@@ -32,16 +32,18 @@ for h,i in enumerate(open(f)):
 			break
 
 
-for k,v in perMG.items():
-	print k,'\t',v['n'],'\t',v['s'],'\t',v['g'],'\t',v['f']
+# for k,v in perMG.items():
+#	print k,'\t',v['n'],'\t',v['s'],'\t',v['g'],'\t',v['f']
 
 for k,v in total.items():
 	print(k,v)
 
-
 with open('per_protein_region_classification.txt','w') as out:
+	out.write('UniProtID\tBUSCO_ID\tNegative\tFamily\tGenus\tSpecies\n')
 	for k,v in r.items():
-		c = Counter(v).items()
-		out.write(k+'\t'+str(c)+'\n')
+		c = dict(Counter(v))
+		mg = uniprot2MG[k]
+		out.write(k+'\t'+mg+'\t'+str(c.get('n',0))+'\t'+str(c.get('f',0))+'\t'+str(c.get('g',0))+'\t'+str(c.get('s',0))+'\n')
+
 		
 
