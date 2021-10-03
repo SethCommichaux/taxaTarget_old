@@ -122,7 +122,7 @@ def LCA(lineages):
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", help="diamond output file", required = True)
 parser.add_argument("-dir", help="path to data directory of taxaTarget", required = True)
-parser.add_argument("-p", help="padding to add to thresholds missing training data",default=0.5,type=float)
+parser.add_argument("-p", help="padding to add to thresholds missing training data",default=0.3,type=float)
 args = parser.parse_args()
 
 # set threshold padding variables
@@ -212,18 +212,17 @@ for k,v in sample_taxa.items():
         del final_read_classifications[k]
         continue
     tmp = []
+    non_zero = 0
     for i in lineage_MGS:
         rd_cnt = v[mg_names.index(i)]
         tmp.append(rd_cnt)
+        if rd_cnt > 0: non_zero += 1
     total_rd_cnt = sum(tmp)
     if total_rd_cnt > 0:
         expected_read_cutoff = expected_read_cnt(total_rd_cnt,len(tmp)) # maximum number of reads expected per marker gene, expecting a uniform distribution
-        non_zero = 0
         for h,i in enumerate(tmp):
             if i > expected_read_cutoff*2:
                 tmp[h] = 0
-            elif i > 0:
-                non_zero += 1
     total_rd_cnt = sum(tmp)
     if total_rd_cnt < 3:
         del_keys.append(k)
