@@ -5,6 +5,6 @@ taxaTarget is a tool for the classification of eukaryotes from metagenomic reads
 * Python3 (version 3.6 or higher; was tested on 3.7)
   * Pandas
   * Numpy
-* Kaiju
-* Diamond
+* [Kaiju](https://github.com/bioinformatics-centre/kaiju)
+* [Diamond](https://github.com/bbuchfink/diamond)
  
