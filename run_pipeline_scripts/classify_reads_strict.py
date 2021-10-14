@@ -6,6 +6,28 @@ import random
 import numpy as np
 from collections import Counter
 
+def filter_diamond_file():
+	# function filters diamond results for read mappings with highest mean bitscore
+	# writes out the best hits to a new file
+	r = {}
+	
+	for i in open(args.d):
+		tmp = i.strip().split('\t')
+		q,l,b = tmp[0],float(tmp[3]),float(tmp[-1])
+		mean_bitscore = b/l
+		if q not in r:
+			r[q] = [[i],mean_bitscore]
+		else:
+			if mean_bitscore == r[q][1]:
+				r[q][0].append(i)
+			elif mean_bitscore > r[q][1]:
+				r[q] = [[i],mean_bitscore]
+		
+	with open(args.d+'.filtered','w') as out:
+		for k,v in r.items():
+			for i in v[0]:
+				out.write(i)
+
 def read_file_info():
 	# function extracts number of reads and mean read length from read_file_info.txt
 	for h,i in enumerate(open('read_file_info.txt')):
@@ -28,14 +50,16 @@ def taxa_mappings():
 def used_classifiers():
 	# identifies all 20 amino acid windows of all database genes that will be used for taxonomic classification
 	# it reduces memory usage to only load classifier data that is relevant to the sample rather than all classifier data
+	multimapped = Counter([]) 
 	c = {}
-	for i in open(args.d):
+	for i in open(args.d+'.filtered'):
 		tmp = i.strip().split('\t')
-		MG,start,end = tmp[1],int(tmp[8]),int(tmp[9])
+		read,MG,start,end = tmp[0],tmp[1],int(tmp[8]),int(tmp[9])
+		multimapped.update([read])
 		region = str(int(20 * math.floor(min(start,end)/20)))
 		MG_region = MG+'_'+region
 		c[MG_region] = {}
-	return c
+	return c,multimapped
 
 def collect_thresholds(classifiers):
 	# for every 20 amino acid region to be used for classification, this function collects the thresholds
@@ -105,13 +129,14 @@ def classify_read_first_pass(smin,gmin,fmin,mean_bitscore):
 
 def expected_read_cnt(total_rd_cnt,total_mgs):
 	r = range(int(total_mgs))
-	L = []
+	results = []
 	
-	for i in range(int(total_rd_cnt)):
-		L.append(random.choice(r))
+	for j in range(100): # run 100 experiments
+		L = [random.choice(r) for i in range(int(total_rd_cnt))]
 		most_common,num_most_common = Counter(L).most_common(1)[0]
+		results.append(num_most_common)
 	
-	return num_most_common
+	return sum(results)/len(results)
 
 def LCA(lineages):
     # function for finding the lowest common ancestor of a list of lineages
@@ -128,6 +153,9 @@ args = parser.parse_args()
 # set threshold padding variables
 padding = args.p
 
+# filter diamond file for best hit read mappings based on mean bitscore
+filter_diamond_file()
+
 # extract number of reads in sample and mean read length
 number_reads,read_len = read_file_info()
 print('Extracted number of reads and mean read length for sample')
@@ -138,7 +166,7 @@ print('collected taxonomy dictionary')
 # maps number of marker genes per family, genus, and species per taxaID
 MGs_per_taxa = {taxaID2Lineage[i.strip().split('\t')[0]]:i.strip().split('\t')[2:] for i in open(args.dir+'/MGs_per_species_genus_family.txt')}
 
-classifiers = used_classifiers()
+classifiers,multimapped = used_classifiers()
 print('diamond file first pass')
 
 classifiers = collect_thresholds(classifiers)
@@ -148,11 +176,10 @@ metadata,MG_per_species,prot2len = collect_classifier_metadata(taxaID2Lineage)
 print('collected relevant metadata for marker genes')
 
 read_classifications = {}
-multimapped = Counter([i.strip().split('\t')[0] for i in open(args.d)])
 genus_species = {}
 
 with open('classified_reads.txt','w') as out:
-	for i in open(args.d):
+	for i in open(args.d+'.filtered'):
 		tmp = i.strip().split('\t')
 		read,MG,pident,aln_len,start,end,bitscore = tmp[0],tmp[1],float(tmp[2]),float(tmp[3]),int(tmp[8]),int(tmp[9]),float(tmp[11])
 		mean_bitscore = bitscore/aln_len
@@ -161,14 +188,16 @@ with open('classified_reads.txt','w') as out:
 			MG_region = MG+'_'+region
 			busco,species,genus,family = metadata[MG]
 			if (multimapped[read] > 1) and (pident == 100):
-				# assign lowest common ancestor to reads that map ambiguously (i.e. 100% identity) to multiple proteins
+				lineage = taxaID2Lineage[species]
 				if read not in read_classifications:
-					read_classifications[read] = [[taxaID2Lineage[species]],set([busco]),mean_bitscore,[prot2len[MG]]]
+					read_classifications[read] = [[lineage],set([busco]),mean_bitscore,[prot2len[MG]]]
 				else:
-					read_classifications[read][0].append(taxaID2Lineage[species])
+					read_classifications[read][0].append(lineage)
 					read_classifications[read][1].update([busco])
 					read_classifications[read][3].append(prot2len[MG])
-			elif classifiers[MG_region] != {}: # check reads map to marker gene regions with classifiers
+				out.write(read+'\tspecies\t'+busco+'\t'+MG_region+'\t'+str(mean_bitscore)+'\t'+lineage+'\n')
+			elif classifiers[MG_region] == {}: continue # check reads map to marker gene regions with classifiers
+			else:
 				nmax,smin,smax,gmin,gmax,fmin,fmax = classifiers[MG_region]
 				nmax,smin,gmin,fmin = pad_thresholds(nmax,smin,smax,gmin,fmin)
 				lineage,rank = classify_read_first_pass(smin,gmin,fmin,mean_bitscore)
@@ -220,7 +249,7 @@ for k,v in sample_taxa.items():
         expected_read_cutoff = expected_read_cnt(total_rd_cnt,len(tmp)) # maximum number of reads expected per marker gene, expecting a uniform distribution
         non_zero = 0
         for h,i in enumerate(tmp):
-            if i > expected_read_cutoff*2:
+            if i > expected_read_cutoff*2.0:
                 tmp[h] = 0
             elif i > 0:
                 non_zero += 1
@@ -247,10 +276,9 @@ for k,v in genus_species.items():
 	for line in v:
 		if line in sample_taxa:
 			s[line] = sample_taxa[line]
-	
 	try:
 		primary,primary_counts = max(s.items(),key=lambda x: x[1][-1])
-		tmp_primary,tmp_counts = max(s.items(),key=lambda x: x[1][-1])
+		tmp_primary,tmp_counts,tmp_reads = max(s.items(),key=lambda x: x[1][-1]),[]
 		for z,w in s.items():
 			if z != primary:
 				shared,different = [0.0,0.0],[0.0,0.0] # [number_genes,number_reads]
@@ -263,31 +291,37 @@ for k,v in genus_species.items():
 						different[1] += w[j]
 				if len(MG_per_species[z]) < 5: # if taxa has les than 5 marker genes, remove
 					del sample_taxa[z]
+					del final_read_classifications[z]
 				elif 0.0 in shared:
 					tmp_primary = tmp_primary.replace(' ','_')
 					tmp_primary += '_???_'+z.split(';')[-1].replace(' ','_')
 					tmp_counts += w
+					tmp_reads += final_read_classifications[z]
 					del sample_taxa[z]
+					del final_read_classifications[z]
 				elif (different[1]/shared[1]) > ((different[0]/shared[0])+0.1*different[0]/shared[0]): # a false positive would be expected to have a lower number of reads mapping to shared genes than to not-shared genes; here within an epsilon of 10% is allowed
 					del sample_taxa[z]
+					tmp_reads += final_read_classifications[z]
+					del final_read_classifications[z]
 					tmp_counts += w
 				del sample_taxa[primary]
+				del final_read_classifications[primary]
 				sample_taxa[tmp_primary] = tmp_counts
+				final_read_classifications[primary] = tmp_reads 
 	except: continue
 
 aggregate_taxa = {}
 
-for k,v in sample_taxa.items():
-    if k == 'names': continue
-    counts = v[-1] # number of mapped reads
-    buscos = {mg_names[h] for h,i in enumerate(v) if i > 0} # number of mapped marker genes
+for k,v in final_read_classifications.items():
     line = ''
+    if k not in sample_taxa: continue
+    buscos = {mg_names[h] for h,i in enumerate(sample_taxa[k][:-1]) if i > 0}
     for j in k.split(';'):
         line += j+';'
         if line not in aggregate_taxa:
-            aggregate_taxa[line] = [counts,buscos]
+            aggregate_taxa[line] = [set(v),buscos] # [[reads],[buscos]]	
         else:
-            aggregate_taxa[line][0] += counts
+            aggregate_taxa[line][0].update(set(v))
             aggregate_taxa[line][1].update(buscos)
 
 with open('final_read_classifications.txt','w') as out:
@@ -298,11 +332,6 @@ with open('final_read_classifications.txt','w') as out:
 print('aggregated results. writing out to taxonomic report')
 
 with open('Taxonomic_report.txt','w') as out:
-	for k,v in sorted(aggregate_taxa.items()):
-		counts,buscos = v[0],v[1]
-		out.write(k+'\t'+str(counts)+'\t'+str(len(buscos))+'\n')
-
-
-
-
-
+        for k,v in sorted(aggregate_taxa.items()):
+                counts,buscos = len(v[0]),len(v[1])
+                out.write(k+'\t'+str(counts)+'\t'+str(buscos)+'\n')
