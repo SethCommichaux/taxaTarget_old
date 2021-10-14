@@ -3,6 +3,6 @@ taxaTarget is a tool for the classification of eukaryotes from metagenomic reads
 
 # Requirements
 * Python3 (version 3.6 or higher; was tested on 3.7)
-** Pandas
-** Numpy
+  Pandas
+  Numpy
  
