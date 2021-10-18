@@ -8,3 +8,5 @@ taxaTarget is a tool for the classification of eukaryotes from metagenomic reads
 * [Kaiju](https://github.com/bioinformatics-centre/kaiju)
 * [Diamond](https://github.com/bbuchfink/diamond)
  
+# Installation
+git clone https://github.com/SethCommichaux/taxaTarget.git
