@@ -10,6 +10,6 @@ taxaTarget is a tool for the classification of eukaryotes from metagenomic reads
  
 # Installation
 
-mkdir taxaTarget
-cd taxaTarget
+mkdir taxaTarget \n
+cd taxaTarget \n
 git clone https://github.com/SethCommichaux/taxaTarget.git
